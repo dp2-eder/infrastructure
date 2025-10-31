@@ -1,0 +1,10 @@
+<network>
+  <name>domotica-net</name>
+  <bridge name='virbr10' stp='on' delay='0'/>
+  <mac address='52:54:00:1A:2B:3C'/>
+  <ip address='10.0.1.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='10.0.1.100' end='10.0.1.200'/>
+    </dhcp>
+  </ip>
+</network>

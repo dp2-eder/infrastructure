@@ -1,0 +1,35 @@
+---
+- hosts: all
+  become: true
+  tags: common
+  roles:
+    - common
+
+- hosts: loadbalancer
+  become: true
+  tags:
+    - loadbalancer
+  roles:
+    - loadbalancer
+
+- hosts: database
+  become: true
+  tags:
+    - database
+  roles:
+    - database
+
+- hosts: webservers
+  become: true
+  tags:
+    - webcore
+  roles:
+    - webcore
+
+- hosts: workers
+  become: true
+  tags:
+    - workers
+  roles:
+    - workers
+

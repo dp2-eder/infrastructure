@@ -1,0 +1,9 @@
+---
+nfs_export_path: /srv/nfs/images
+nfs_client_network: 10.0.1.0/24
+nfs_client_options: rw,sync,no_subtree_check,no_root_squash
+mysql_database_name: prod
+mysql_user: prod_user
+mysql_password: domotica-prod
+rabbitmq_user: rabbit_user
+rabbitmq_password: rabbit_pass

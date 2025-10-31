@@ -1,0 +1,19 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Upgrade installed packages
+  ansible.builtin.apt:
+    upgrade: dist
+    autoremove: true
+  register: upgrade_result
+
+- name: Ensure base packages are installed
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - vim
+    state: present

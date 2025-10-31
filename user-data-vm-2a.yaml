@@ -1,0 +1,29 @@
+#cloud-config
+user: dp2-user
+password: domotica-prod
+chpasswd: { expire: False }
+ssh_pwauth: True
+package_update: true
+packages:
+  - qemu-guest-agent
+
+runcmd:
+  - |
+      cat <<'EOF' > /etc/netplan/99-config.yaml
+      network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          enp1s0:
+            dhcp4: no
+            addresses:
+              - 10.0.1.21/24
+            routes:
+              - to: default
+                via: 10.0.1.10
+            nameservers:
+              addresses:
+                - 8.8.8.8
+                - 1.1.1.1
+      EOF
+  - 'netplan apply'

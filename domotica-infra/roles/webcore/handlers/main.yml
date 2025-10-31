@@ -1,0 +1,5 @@
+---
+- name: Recreate web stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ webcore_app_root }}"
+    state: present

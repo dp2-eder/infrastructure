@@ -1,0 +1,10 @@
+---
+webcore_app_root: /var/www
+webcore_front_repo: https://github.com/dp2-eder/front-dp2.git
+webcore_back_repo: https://github.com/dp2-eder/back-dp2.git
+webcore_mount_path: /mnt/images
+webcore_backend_env_content: |
+  DATABASE_URL=mysql+pymysql://{{ mysql_user }}:{{ mysql_password }}@10.0.1.30/{{ mysql_database_name }}
+  RABBITMQ_HOST=10.0.1.30
+  RABBITMQ_USER={{ rabbitmq_user }}
+  RABBITMQ_PASS={{ rabbitmq_password }}

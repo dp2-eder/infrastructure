@@ -1,0 +1,35 @@
+---
+- name: Ensure storage and messaging packages are installed
+  ansible.builtin.apt:
+    name:
+      - mysql-server
+      - python3-pymysql
+      - rabbitmq-server
+      - nfs-kernel-server
+    state: present
+
+- name: Ensure services are enabled
+  ansible.builtin.service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - mysql
+    - rabbitmq-server
+    - nfs-kernel-server
+
+- name: Ensure NFS export directory exists
+  ansible.builtin.file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0775"
+
+- name: Configure NFS export
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    regexp: '^{{ nfs_export_path | regex_escape }}\s'
+    line: "{{ nfs_export_path }} {{ nfs_client_network }}({{ nfs_client_options }})"
+    create: true
+  notify: Reload NFS exports

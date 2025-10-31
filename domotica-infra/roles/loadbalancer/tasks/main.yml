@@ -1,0 +1,41 @@
+---
+- name: Ensure NAT helper packages are installed
+  ansible.builtin.apt:
+    name:
+      - iptables-persistent
+      - netfilter-persistent
+    state: present
+
+- name: Enable IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: true
+
+- name: Persist IPv4 forwarding configuration
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-forwarding.conf
+    content: "net.ipv4.ip_forward=1\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Check if NAT masquerade rule exists
+  ansible.builtin.command:
+    cmd: "iptables -t nat -C POSTROUTING -s 10.0.1.0/24 -o {{ nat_external_interface }} -j MASQUERADE"
+  register: nat_rule_check
+  changed_when: false
+  failed_when: false
+
+- name: Configure NAT masquerade rule
+  ansible.builtin.command:
+    cmd: "iptables -t nat -A POSTROUTING -s 10.0.1.0/24 -o {{ nat_external_interface }} -j MASQUERADE"
+  when: nat_rule_check.rc != 0
+  notify: Save iptables rules
+
+- name: Ensure netfilter-persistent service is enabled
+  ansible.builtin.service:
+    name: netfilter-persistent
+    enabled: true
+    state: started

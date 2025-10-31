@@ -1,0 +1,74 @@
+---
+- name: Ensure base packages for Docker are present
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Check if Docker keyring exists
+  ansible.builtin.stat:
+    path: /etc/apt/keyrings/docker.asc
+  register: docker_keyring
+
+- name: Download Docker GPG key when missing
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+  when: not docker_keyring.stat.exists
+
+- name: Set permissions on Docker keyring
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Add Docker APT repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: |
+      deb [arch={{ ansible_facts.debian_architecture | default('amd64') }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts.lsb.codename | default('noble') }} stable
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Update apt cache after adding Docker repo
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Ensure docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+
+- name: Add deployment user to docker group
+  ansible.builtin.user:
+    name: "{{ docker_user | default(ansible_user) }}"
+    groups: docker
+    append: true
+
+- name: Ensure Docker services are enabled
+  ansible.builtin.service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - docker
+    - containerd
