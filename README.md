@@ -4,7 +4,7 @@ Este documento resume las tareas pendientes y acuerdos del área de DevOps a par
 
 ---
 
-### 📝 Revisión de Arquitectura (30/10)
+### Revisión de Arquitectura (30/10)
 
 Se detallaron los siguientes puntos sobre la arquitectura propuesta:
 
