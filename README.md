@@ -1,4 +1,4 @@
-## Pendientes DevOps
+## Pendientes para DevOps
 
 Este documento resume las tareas pendientes y acuerdos del área de DevOps a partir de la reunión del **30/10**. Se presenta en un formato limpio y profesional, apto para un archivo `README.md` en GitHub.
 
