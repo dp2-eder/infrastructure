@@ -70,24 +70,29 @@ step_mysql_setup() {
     local DB_NAME="dp2_qa_db"
     local DB_USER="dp2_qa_user"
     local DB_PASSWORD="dp2_qa_password"
+    local MYSQL_CONF_FILE="/etc/mysql/mysql.conf.d/mysqld.cnf"
     
+    log "  Instalando MySQL server..."
     sudo apt install -y mysql-server
-    sudo systemctl start mysql
-    sudo systemctl enable mysql
     
-    # Wait for MySQL to be ready
-    for i in {1..30}; do
-        if sudo mysqladmin ping -h localhost --silent; then
-            break
-        fi
-        sleep 1
-    done
-    
+    log "  Creando base de datos y usuario..."
     sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};" || return 1
     sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';" || return 1
     sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%';" || return 1
     sudo mysql -e "FLUSH PRIVILEGES;" || return 1
     
+    log "  Configurando MySQL para escuchar en 0.0.0.0..."
+    if [ -f "$MYSQL_CONF_FILE" ]; then
+        sudo sed -i "s/^\(bind-address\s*=\s*\)127\.0\.0\.1/\10.0.0.0/" "$MYSQL_CONF_FILE"
+        log "  bind-address actualizado en $MYSQL_CONF_FILE"
+    else
+        log "  Advertencia: No se encontró $MYSQL_CONF_FILE. Omitiendo."
+    fi
+    
+    log "  Reiniciando MySQL para aplicar la configuración..."
+    sudo systemctl restart mysql
+    sudo systemctl enable mysql
+
     return 0
 }
 
@@ -356,14 +361,7 @@ step_docker_compose_up() {
         return 1
     fi
     
-    # Use docker compose (without hyphen for newer versions)
-    if sudo docker compose version &>/dev/null; then
-        sudo docker compose up -d --build || return 1
-    else
-        # Fallback to docker-compose (older versions)
-        sudo docker-compose up -d --build || return 1
-    fi
-    
+    sudo docker compose up -d --build || return 1
     return 0
 }
 
