@@ -351,23 +351,6 @@ step_copy_env_files() {
 run_step "copy_env_files" step_copy_env_files
 
 # ============================================
-# STEP 10: Start Docker Compose Services
-# ============================================
-step_docker_compose_up() {
-    cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
-    
-    if [ ! -f "docker-compose.yml" ]; then
-        log "Error: docker-compose.yml not found in /var/www/"
-        return 1
-    fi
-    
-    sudo docker compose up -d --build || return 1
-    return 0
-}
-
-run_step "docker_compose_up" step_docker_compose_up
-
-# ============================================
 # Installation Complete
 # ============================================
 log "========================================"
