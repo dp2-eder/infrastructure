@@ -15,7 +15,7 @@ services:
       - /mnt/images:/app/static/images
 
   scrapper_app:
-    build: ./scrapper
+    build: ./scrapper-dp2
     container_name: scrapper_app
     restart: unless-stopped
     env_file: ./scrapper-dp2/.env
