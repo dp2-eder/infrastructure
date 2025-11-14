@@ -239,13 +239,8 @@ run_step "clone_repos" step_clone_repos
 step_build_frontend() {
     cd /var/www/front-dp2/ || { log "Cannot cd to front-dp2"; return 1; }
     
-    # Check if Node.js is available
-    if ! command -v node &> /dev/null; then
-        log "Node.js not found in system, will use Docker container for build"
-        # Pull node image if not exists
-        sudo docker pull node:25-alpine || return 1
-    fi
-    
+    curl -fsSL https://deb.nodesource.com/setup_current.x | sudo -E bash -
+    sudo apt install -y nodejs
     # Build using npm if available, otherwise skip (Docker will build it)
     if [ -f "package.json" ]; then
         if command -v npm &> /dev/null; then
