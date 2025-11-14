@@ -2,7 +2,7 @@
 # This script is only for Ubuntu systems
 sudo apt update -y
 sudo apt upgrade -y
-sudo apt install -y git curl wget build-essential nodejs npm nginx
+sudo apt install -y git curl wget build-essential nginx
 
 # MySQL installation
 sudo apt install -y mysql-server
@@ -64,6 +64,9 @@ sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin dock
 
 # Post-installation steps
 sudo usermod -aG docker $USER
+
+docker pull node:25-alpine
+docker run -it --rm --entrypoint sh node:25-alpine
 
 # setup /var/www/
 sudo mkdir -p /var/www/
