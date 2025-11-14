@@ -69,17 +69,34 @@ sudo usermod -aG docker $USER
 sudo mkdir -p /var/www/
 sudo chown -R $USER:$USER /var/www/
 sudo chmod -R 755 /var/www/
-cp ../docker/docker-qa-compose.yml /var/www/docker-compose.yml
-cd /var/www/
-# clone repositories
-# Web Service FastAPI + SQLAlchemy + Produce messages to RabbitMQ + Saves images to /mnt/images + Port 8000
-git clone https://github.com/dp2-eder/back-dp2.git
-# Web Service Nextjs + React + Port 3000
-git clone https://github.com/dp2-eder/front-dp2.git
-# Web Service FastAPI + Selenium + Consumes RabbitMQ + Port 8080
-git clone https://github.com/dp2-eder/scrapper-dp2.git
-# Admin Panel Vite + React (Static Files)
-git clone https://github.com/dp2-eder/front-admin.git
+cp docker/docker-qa-compose.yml /var/www/docker-compose.yml
+cd /var/www/ || { echo "Cannot cd /var/www/"; exit 1; }
+
+clone_or_update() {
+    local url="$1" dir="$2"
+    if [ -d "$dir" ]; then
+        if [ -d "$dir/.git" ]; then
+            echo "Updating existing repo $dir..."
+            git -C "$dir" fetch --all --prune || { echo "git fetch failed for $dir"; exit 1; }
+            # Try a safe pull; prefer resetting to remote HEAD to avoid local conflicts
+            git -C "$dir" reset --hard origin/HEAD >/dev/null 2>&1 || git -C "$dir" pull || { echo "Failed to update $dir"; exit 1; }
+        else
+            timestamp=$(date +%s)
+            echo "Directory $dir exists but is not a git repo. Backing up to ${dir}.bak.$timestamp"
+            mv "$dir" "${dir}.bak.$timestamp" || { echo "Failed to backup $dir"; exit 1; }
+            echo "Cloning $url into $dir..."
+            git clone "$url" "$dir" || { echo "Failed to clone $url"; exit 1; }
+        fi
+    else
+        echo "Cloning $url into $dir..."
+        git clone "$url" "$dir" || { echo "Failed to clone $url"; exit 1; }
+    fi
+}
+
+clone_or_update https://github.com/dp2-eder/back-dp2.git back-dp2
+clone_or_update https://github.com/dp2-eder/front-dp2.git front-dp2
+clone_or_update https://github.com/dp2-eder/scrapper-dp2.git scrapper-dp2
+clone_or_update https://github.com/dp2-eder/front-admin.git front-admin
 
 sudo mkdir -p /mnt/images
 sudo chown -R $USER:$USER /mnt/images
