@@ -1,103 +1,306 @@
 #!/bin/bash
 # This script is only for Ubuntu systems
-sudo apt update -y
-sudo apt upgrade -y
-sudo apt install -y git curl wget build-essential nginx
+set -e  # Exit on error
 
-# MySQL installation
-sudo apt install -y mysql-server
-sudo systemctl start mysql
-sudo systemctl enable mysql
+# Configuration
+CHECKPOINT_FILE="/var/lib/dp2/install_qa.checkpoint"
+LOG_FILE="/var/log/dp2_install_qa.log"
 
-# Create a default database and user
-DB_NAME="dp2_qa_db"
-DB_USER="dp2_qa_user"
-DB_PASSWORD="dp2_qa_password"
-sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
-sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%';"
-sudo mysql -e "FLUSH PRIVILEGES;"
+# Ensure checkpoint directory exists
+sudo mkdir -p "$(dirname "$CHECKPOINT_FILE")"
+sudo mkdir -p "$(dirname "$LOG_FILE")"
 
-# RabbitMQ installation
-sudo apt install -y rabbitmq-server
-sudo systemctl enable rabbitmq-server
-sudo systemctl start rabbitmq-server
-sudo rabbitmq-plugins enable --offline rabbitmq_management
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOG_FILE"
+}
 
-# RabbitMQ default vhost and user for QA
-RABBITMQ_VHOST="dp2_qa_vhost"
-RABBITMQ_USER="dp2_qa_user"
-RABBITMQ_PASSWORD="dp2_qa_password"
-if sudo rabbitmqctl list_vhosts | grep -q "^${RABBITMQ_VHOST}$"; then
-    sudo rabbitmqctl clear_permissions -p "${RABBITMQ_VHOST}" "${RABBITMQ_USER}" >/dev/null 2>&1 || true
-else
-    sudo rabbitmqctl add_vhost "${RABBITMQ_VHOST}"
-fi
-if sudo rabbitmqctl list_users | grep -q "^${RABBITMQ_USER}\b"; then
-    sudo rabbitmqctl change_password "${RABBITMQ_USER}" "${RABBITMQ_PASSWORD}"
-else
-    sudo rabbitmqctl add_user "${RABBITMQ_USER}" "${RABBITMQ_PASSWORD}"
-fi
-sudo rabbitmqctl set_permissions -p "${RABBITMQ_VHOST}" "${RABBITMQ_USER}" ".*" ".*" ".*"
+# Check if a step is already completed
+is_step_done() {
+    [ -f "$CHECKPOINT_FILE" ] && grep -q "^$1$" "$CHECKPOINT_FILE"
+}
 
-# Docker installation
-# Add Docker's official GPG key:
-sudo apt update -y
-sudo apt install ca-certificates curl -y
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Mark a step as completed
+mark_step_done() {
+    log "✓ Completed: $1"
+    echo "$1" | sudo tee -a "$CHECKPOINT_FILE" >/dev/null
+}
 
-# Add the repository to Apt sources:
-sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+# Execute a step only if not already done
+run_step() {
+    local step_name="$1"
+    shift
+    
+    if is_step_done "$step_name"; then
+        log "⊳ Skipping (already done): $step_name"
+        return 0
+    fi
+    
+    log "▶ Starting: $step_name"
+    if "$@"; then
+        mark_step_done "$step_name"
+        return 0
+    else
+        log "✗ Failed: $step_name"
+        return 1
+    fi
+}
+
+log "========================================"
+log "Starting DP2 QA Environment Installation"
+log "========================================"
+
+# ============================================
+# STEP 1: System Update and Base Packages
+# ============================================
+step_system_update() {
+    sudo apt update -y
+    sudo apt upgrade -y
+    sudo apt install -y git curl wget build-essential nginx
+}
+
+run_step "system_update" step_system_update
+
+# ============================================
+# STEP 2: MySQL Installation and Configuration
+# ============================================
+step_mysql_setup() {
+    local DB_NAME="dp2_qa_db"
+    local DB_USER="dp2_qa_user"
+    local DB_PASSWORD="dp2_qa_password"
+    
+    sudo apt install -y mysql-server
+    sudo systemctl start mysql
+    sudo systemctl enable mysql
+    
+    # Wait for MySQL to be ready
+    for i in {1..30}; do
+        if sudo mysqladmin ping -h localhost --silent; then
+            break
+        fi
+        sleep 1
+    done
+    
+    sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};" || return 1
+    sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';" || return 1
+    sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%';" || return 1
+    sudo mysql -e "FLUSH PRIVILEGES;" || return 1
+    
+    return 0
+}
+
+run_step "mysql_setup" step_mysql_setup
+
+# ============================================
+# STEP 3: RabbitMQ Installation and Configuration
+# ============================================
+step_rabbitmq_setup() {
+    local RABBITMQ_VHOST="dp2_qa_vhost"
+    local RABBITMQ_USER="dp2_qa_user"
+    local RABBITMQ_PASSWORD="dp2_qa_password"
+    
+    sudo apt install -y rabbitmq-server
+    sudo systemctl enable rabbitmq-server
+    sudo systemctl start rabbitmq-server
+    
+    # Wait for RabbitMQ to be ready
+    for i in {1..30}; do
+        if sudo rabbitmqctl status >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+    
+    sudo rabbitmq-plugins enable rabbitmq_management
+    
+    # Setup vhost and user
+    if sudo rabbitmqctl list_vhosts | grep -q "^${RABBITMQ_VHOST}$"; then
+        sudo rabbitmqctl clear_permissions -p "${RABBITMQ_VHOST}" "${RABBITMQ_USER}" >/dev/null 2>&1 || true
+    else
+        sudo rabbitmqctl add_vhost "${RABBITMQ_VHOST}"
+    fi
+    
+    if sudo rabbitmqctl list_users | grep -q "^${RABBITMQ_USER}\b"; then
+        sudo rabbitmqctl change_password "${RABBITMQ_USER}" "${RABBITMQ_PASSWORD}"
+    else
+        sudo rabbitmqctl add_user "${RABBITMQ_USER}" "${RABBITMQ_PASSWORD}"
+    fi
+    
+    sudo rabbitmqctl set_permissions -p "${RABBITMQ_VHOST}" "${RABBITMQ_USER}" ".*" ".*" ".*"
+    
+    return 0
+}
+
+run_step "rabbitmq_setup" step_rabbitmq_setup
+
+# ============================================
+# STEP 4: Docker Installation
+# ============================================
+step_docker_install() {
+    # Add Docker's official GPG key
+    sudo apt update -y
+    sudo apt install ca-certificates curl -y
+    sudo install -m 0755 -d /etc/apt/keyrings
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+    
+    # Add the repository to Apt sources
+    sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
 Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
 Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
+    
+    sudo apt update -y
+    sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    
+    # Post-installation steps
+    sudo usermod -aG docker $USER
+    
+    # Verify Docker installation
+    sudo docker --version || return 1
+    
+    return 0
+}
 
-sudo apt update -y
+run_step "docker_install" step_docker_install
 
-# Install Docker Engine, CLI, and Containerd
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+# ============================================
+# STEP 5: Setup Working Directories
+# ============================================
+step_setup_directories() {
+    sudo mkdir -p /var/www/
+    sudo chown -R $USER:$USER /var/www/
+    sudo chmod -R 755 /var/www/
+    
+    sudo mkdir -p /mnt/images
+    sudo chown -R $USER:$USER /mnt/images
+    sudo chmod -R 755 /mnt/images
+    
+    # Copy docker-compose file if it exists
+    if [ -f "docker-compose-vmqa.yml" ]; then
+        cp docker-compose-vmqa.yml /var/www/docker-compose.yml
+    elif [ -f "../docker/docker-compose-vmqa.yml" ]; then
+        cp ../docker/docker-compose-vmqa.yml /var/www/docker-compose.yml
+    else
+        log "Warning: docker-compose-vmqa.yml not found"
+    fi
+    
+    return 0
+}
 
-# Post-installation steps
-sudo usermod -aG docker $USER
+run_step "setup_directories" step_setup_directories
 
-# setup /var/www/
-sudo mkdir -p /var/www/
-sudo chown -R $USER:$USER /var/www/
-sudo chmod -R 755 /var/www/
-cp docker/docker-qa-compose.yml /var/www/docker-compose.yml
-cd /var/www/ || { echo "Cannot cd /var/www/"; exit 1; }
+# ============================================
+# STEP 6: Clone/Update Repositories
+# ============================================
 
 clone_or_update() {
     local url="$1" dir="$2"
     if [ -d "$dir" ]; then
         if [ -d "$dir/.git" ]; then
-            echo "Updating existing repo $dir..."
-            git -C "$dir" fetch --all --prune || { echo "git fetch failed for $dir"; exit 1; }
+            log "Updating existing repo $dir..."
+            git -C "$dir" fetch --all --prune || { log "git fetch failed for $dir"; return 1; }
             # Try a safe pull; prefer resetting to remote HEAD to avoid local conflicts
-            git -C "$dir" reset --hard origin/HEAD >/dev/null 2>&1 || git -C "$dir" pull || { echo "Failed to update $dir"; exit 1; }
+            git -C "$dir" reset --hard origin/HEAD >/dev/null 2>&1 || git -C "$dir" pull || { log "Failed to update $dir"; return 1; }
         else
             timestamp=$(date +%s)
-            echo "Directory $dir exists but is not a git repo. Backing up to ${dir}.bak.$timestamp"
-            mv "$dir" "${dir}.bak.$timestamp" || { echo "Failed to backup $dir"; exit 1; }
-            echo "Cloning $url into $dir..."
-            git clone "$url" "$dir" || { echo "Failed to clone $url"; exit 1; }
+            log "Directory $dir exists but is not a git repo. Backing up to ${dir}.bak.$timestamp"
+            mv "$dir" "${dir}.bak.$timestamp" || { log "Failed to backup $dir"; return 1; }
+            log "Cloning $url into $dir..."
+            git clone "$url" "$dir" || { log "Failed to clone $url"; return 1; }
         fi
     else
-        echo "Cloning $url into $dir..."
-        git clone "$url" "$dir" || { echo "Failed to clone $url"; exit 1; }
+        log "Cloning $url into $dir..."
+        git clone "$url" "$dir" || { log "Failed to clone $url"; return 1; }
     fi
+    return 0
 }
 
-clone_or_update https://github.com/dp2-eder/back-dp2.git back-dp2
-clone_or_update https://github.com/dp2-eder/front-dp2.git front-dp2
-clone_or_update https://github.com/dp2-eder/scrapper-dp2.git scrapper-dp2
-clone_or_update https://github.com/dp2-eder/front-admin.git front-admin
+step_clone_repos() {
+    cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
+    
+    clone_or_update https://github.com/dp2-eder/back-dp2.git back-dp2 || return 1
+    clone_or_update https://github.com/dp2-eder/front-dp2.git front-dp2 || return 1
+    clone_or_update https://github.com/dp2-eder/scrapper-dp2.git scrapper-dp2 || return 1
+    clone_or_update https://github.com/dp2-eder/front-admin.git front-admin || return 1
+    
+    return 0
+}
 
-sudo mkdir -p /mnt/images
-sudo chown -R $USER:$USER /mnt/images
-sudo chmod -R 755 /mnt/images
+run_step "clone_repos" step_clone_repos
+
+# ============================================
+# STEP 7: Build Frontend (Optional)
+# ============================================
+step_build_frontend() {
+    cd /var/www/front-dp2/ || { log "Cannot cd to front-dp2"; return 1; }
+    
+    # Check if Node.js is available
+    if ! command -v node &> /dev/null; then
+        log "Node.js not found in system, will use Docker container for build"
+        # Pull node image if not exists
+        sudo docker pull node:25-alpine || return 1
+    fi
+    
+    # Build using npm if available, otherwise skip (Docker will build it)
+    if [ -f "package.json" ]; then
+        if command -v npm &> /dev/null; then
+            log "Building frontend with system npm..."
+            npm install || { log "npm install failed"; return 1; }
+            npm run build || { log "npm build failed"; return 1; }
+        else
+            log "npm not available, frontend will be built during docker compose up"
+        fi
+    fi
+    
+    cd /var/www/
+    return 0
+}
+
+run_step "build_frontend" step_build_frontend
+
+# ============================================
+# STEP 8: Start Docker Compose Services
+# ============================================
+step_docker_compose_up() {
+    cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
+    
+    if [ ! -f "docker-compose.yml" ]; then
+        log "Error: docker-compose.yml not found in /var/www/"
+        return 1
+    fi
+    
+    # Use docker compose (without hyphen for newer versions)
+    if sudo docker compose version &>/dev/null; then
+        sudo docker compose up -d --build || return 1
+    else
+        # Fallback to docker-compose (older versions)
+        sudo docker-compose up -d --build || return 1
+    fi
+    
+    return 0
+}
+
+run_step "docker_compose_up" step_docker_compose_up
+
+# ============================================
+# Installation Complete
+# ============================================
+log "========================================"
+log "✓ DP2 QA Environment Installation Complete!"
+log "========================================"
+log ""
+log "Services status:"
+sudo docker ps 2>/dev/null || log "Docker containers not running or docker not accessible"
+log ""
+log "MySQL Database: dp2_qa_db (user: dp2_qa_user)"
+log "RabbitMQ vhost: dp2_qa_vhost (user: dp2_qa_user)"
+log "Application directory: /var/www/"
+log "Images directory: /mnt/images"
+log ""
+log "To view logs: tail -f $LOG_FILE"
+log "To reset installation: sudo rm $CHECKPOINT_FILE"
+log ""
