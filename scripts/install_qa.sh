@@ -14,7 +14,7 @@ DB_NAME="dp2_qa_db"
 DB_USER="dp2_qa_user"
 DB_PASSWORD="dp2_qa_password"
 sudo mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
-sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';"
+sudo mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';"
 sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%';"
 sudo mysql -e "FLUSH PRIVILEGES;"
 
@@ -65,9 +65,6 @@ sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin dock
 # Post-installation steps
 sudo usermod -aG docker $USER
 
-docker pull node:25-alpine
-docker run -it --rm --entrypoint sh node:25-alpine
-
 # setup /var/www/
 sudo mkdir -p /var/www/
 sudo chown -R $USER:$USER /var/www/
@@ -84,12 +81,6 @@ git clone https://github.com/dp2-eder/scrapper-dp2.git
 # Admin Panel Vite + React (Static Files)
 git clone https://github.com/dp2-eder/front-admin.git
 
-cd /var/www/front-admin
-npm install
-npm run build
-cd /var/www/
-
 sudo mkdir -p /mnt/images
 sudo chown -R $USER:$USER /mnt/images
 sudo chmod -R 755 /mnt/images
-sudo docker compose -f /var/www/docker-compose.yml up -d
