@@ -89,4 +89,4 @@ cd /var/www/
 sudo mkdir -p /mnt/images
 sudo chown -R $USER:$USER /mnt/images
 sudo chmod -R 755 /mnt/images
-sudo docker-compose -f /var/www/docker-compose.yml up -d
+sudo docker compose -f /var/www/docker-compose.yml up -d
