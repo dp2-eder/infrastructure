@@ -56,7 +56,7 @@ log "========================================"
 step_system_update() {
     sudo apt update -y
     sudo apt upgrade -y
-    sudo apt install -y git curl wget build-essential nginx
+    sudo apt install -y git curl wget build-essential
 }
 
 run_step "system_update" step_system_update
@@ -179,11 +179,36 @@ step_setup_directories() {
     sudo chown -R $USER:$USER /mnt/images
     sudo chmod -R 755 /mnt/images
     
+    # Create nginx directory
+    sudo mkdir -p /var/www/nginx
+    sudo chown -R $USER:$USER /var/www/nginx
+    
+    # Create env_files directory
+    sudo mkdir -p /var/www/env_files
+    sudo chown -R $USER:$USER /var/www/env_files
+    
     # Copy docker-compose file if it exists
     if [ -f "docker/docker-compose-vmqa.yml" ]; then
         cp docker/docker-compose-vmqa.yml /var/www/docker-compose.yml
+        log "Copied docker-compose-vmqa.yml to /var/www/docker-compose.yml"
     else
         log "Warning: docker-compose-vmqa.yml not found"
+    fi
+    
+    # Copy nginx configuration
+    if [ -f "nginx/vmqa-nginx.conf" ]; then
+        cp nginx/vmqa-nginx.conf /var/www/nginx/vmqa-nginx.conf
+        log "Copied nginx configuration to /var/www/nginx/"
+    else
+        log "Warning: nginx/vmqa-nginx.conf not found"
+    fi
+    
+    # Copy QA environment files
+    if [ -d "env_files" ]; then
+        cp env_files/env.*.qa /var/www/env_files/ 2>/dev/null || log "No QA env files found to copy"
+        log "Copied QA environment files to /var/www/env_files/"
+    else
+        log "Warning: env_files directory not found"
     fi
     
     return 0
@@ -239,24 +264,109 @@ step_build_frontend() {
 run_step "build_frontend" step_build_frontend
 
 # ============================================
-# STEP 8: Copy Environment Files
+# STEP 7.5: Build Admin Panel (Static Files)
+# ============================================
+step_build_admin() {
+    cd /var/www/front-admin/ || { log "Cannot cd to front-admin"; return 1; }
+    
+    # Build using npm if available
+    if [ -f "package.json" ]; then
+        if command -v npm &> /dev/null; then
+            log "Building admin panel with system npm..."
+            npm install || { log "npm install failed for admin"; return 1; }
+            npm run build || { log "npm build failed for admin"; return 1; }
+        else
+            log "Warning: npm not available, admin panel will not be built"
+            log "Creating empty dist directory to prevent nginx errors"
+            mkdir -p dist
+            echo "<h1>Admin Panel - Build Required</h1>" > dist/index.html
+        fi
+    else
+        log "Warning: package.json not found in front-admin"
+        mkdir -p dist
+        echo "<h1>Admin Panel - Build Required</h1>" > dist/index.html
+    fi
+    
+    cd /var/www/
+    return 0
+}
+
+run_step "build_admin" step_build_admin
+
+# ============================================
+# STEP 8: Setup Nginx Configuration
+# ============================================
+step_setup_nginx() {
+    # Stop and disable system nginx since we'll use Docker nginx
+    if systemctl is-active --quiet nginx; then
+        log "Stopping system nginx (will use Docker nginx instead)"
+        sudo systemctl stop nginx
+        sudo systemctl disable nginx
+    fi
+    
+    # Verify nginx configuration exists
+    if [ ! -f "/var/www/nginx/vmqa-nginx.conf" ]; then
+        log "Error: nginx configuration not found at /var/www/nginx/vmqa-nginx.conf"
+        return 1
+    fi
+    
+    log "Nginx configuration ready for Docker container"
+    
+    return 0
+}
+
+run_step "setup_nginx" step_setup_nginx
+
+# ============================================
+# STEP 9: Copy Environment Files
 # ============================================
 step_copy_env_files() {
-    # Copy .env.example to .env in each repo if .env does not exist
-    for repo in back-dp2 front-dp2 scrapper-dp2 front-admin; do
-        cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
-        if [ -d "$repo" ]; then
-            cd "$repo" || { log "Cannot cd to $repo"; return 1; }
-            if [ -f ".env.example" ] && [ ! -f ".env" ]; then
-                cp .env.example .env
-                log "Copied .env.example to .env in $repo"
-            else
-                log ".env already exists or .env.example missing in $repo"
-            fi
-        else
-            log "Repository $repo does not exist"
+    cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
+    
+    # Copy QA-specific .env files from env_files directory
+    
+    if [ -f "env_files/env.back-dp2.qa" ]; then
+        cp env_files/env.back-dp2.qa back-dp2/.env
+        log "Copied env.back-dp2.qa to back-dp2/.env"
+    else
+        log "Warning: env.back-dp2.qa not found, checking for .env.example in back-dp2"
+        if [ -f "back-dp2/.env.example" ] && [ ! -f "back-dp2/.env" ]; then
+            cp back-dp2/.env.example back-dp2/.env
+            log "Copied .env.example to .env in back-dp2"
         fi
-    done
+    fi
+    
+    if [ -f "env_files/env.front-dp2.qa" ]; then
+        cp env_files/env.front-dp2.qa front-dp2/.env
+        log "Copied env.front-dp2.qa to front-dp2/.env"
+    else
+        log "Warning: env.front-dp2.qa not found, checking for .env.example in front-dp2"
+        if [ -f "front-dp2/.env.example" ] && [ ! -f "front-dp2/.env" ]; then
+            cp front-dp2/.env.example front-dp2/.env
+            log "Copied .env.example to .env in front-dp2"
+        fi
+    fi
+    
+    if [ -f "env_files/env.scrapper-dp2.qa" ]; then
+        cp env_files/env.scrapper-dp2.qa scrapper-dp2/.env
+        log "Copied env.scrapper-dp2.qa to scrapper-dp2/.env"
+    else
+        log "Warning: env.scrapper-dp2.qa not found, checking for .env.example in scrapper-dp2"
+        if [ -f "scrapper-dp2/.env.example" ] && [ ! -f "scrapper-dp2/.env" ]; then
+            cp scrapper-dp2/.env.example scrapper-dp2/.env
+            log "Copied .env.example to .env in scrapper-dp2"
+        fi
+    fi
+    
+    # front-admin might not have a QA-specific env file
+    if [ -d "front-admin" ]; then
+        if [ -f "front-admin/.env.example" ] && [ ! -f "front-admin/.env" ]; then
+            cp front-admin/.env.example front-admin/.env
+            log "Copied .env.example to .env in front-admin"
+        else
+            log ".env already exists or .env.example missing in front-admin"
+        fi
+    fi
 
     return 0
 }
@@ -264,7 +374,7 @@ step_copy_env_files() {
 run_step "copy_env_files" step_copy_env_files
 
 # ============================================
-# STEP 9: Start Docker Compose Services
+# STEP 10: Start Docker Compose Services
 # ============================================
 step_docker_compose_up() {
     cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
