@@ -18,7 +18,7 @@ services:
     build: ./scrapper
     container_name: scrapper_app
     restart: unless-stopped
-    env_file: ./scrapper/.env
+    env_file: ./scrapper-dp2/.env
     volumes:
       - /mnt/images:/app/static/images
 
