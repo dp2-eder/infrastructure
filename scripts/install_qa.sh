@@ -57,6 +57,8 @@ step_system_update() {
     sudo apt update -y
     sudo apt upgrade -y
     sudo apt install -y git curl wget build-essential
+    curl -fsSL https://deb.nodesource.com/setup_current.x | sudo -E bash -
+    sudo apt install -y nodejs
 }
 
 run_step "system_update" step_system_update
@@ -217,7 +219,7 @@ step_setup_directories() {
 run_step "setup_directories" step_setup_directories
 
 # ============================================
-# STEP 6: Clone/Update Repositories
+# STEP 6: Clone Repositories
 # ============================================
 
 step_clone_repos() {
@@ -232,31 +234,6 @@ step_clone_repos() {
 }
 
 run_step "clone_repos" step_clone_repos
-
-# ============================================
-# STEP 7: Build Frontend (Optional)
-# ============================================
-step_build_frontend() {
-    cd /var/www/front-dp2/ || { log "Cannot cd to front-dp2"; return 1; }
-    
-    curl -fsSL https://deb.nodesource.com/setup_current.x | sudo -E bash -
-    sudo apt install -y nodejs
-    # Build using npm if available, otherwise skip (Docker will build it)
-    if [ -f "package.json" ]; then
-        if command -v npm &> /dev/null; then
-            log "Building frontend with system npm..."
-            npm install || { log "npm install failed"; return 1; }
-            npm run build || { log "npm build failed"; return 1; }
-        else
-            log "npm not available, frontend will be built during docker compose up"
-        fi
-    fi
-    
-    cd /var/www/
-    return 0
-}
-
-run_step "build_frontend" step_build_frontend
 
 # ============================================
 # STEP 7.5: Build Admin Panel (Static Files)
