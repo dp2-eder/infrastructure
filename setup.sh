@@ -96,7 +96,7 @@ EOF
 # crear_vm "vm-2a" 2048 2 "10G" "user-data-vm-2a.yaml" ""
 # crear_vm "vm-3"  2048 2 "10G" "user-data-vm-3.yaml"  ""
 
-crear_vm "vm-qa" 2048 2 "20G" "user-data-vm-qa.yaml" "--network network=default,model=virtio"
+crear_vm "vm-qa" 4196 4 "20G" "user-data-vm-qa.yaml" "--network network=default,model=virtio"
 
 echo "--- ¡Arquitectura desplegada! ---"
 echo "Las VMs están arrancando y auto-configurando sus IPs."

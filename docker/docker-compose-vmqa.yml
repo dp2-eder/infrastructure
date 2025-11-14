@@ -13,14 +13,16 @@ services:
     env_file: ./back-dp2/.env
     volumes:
       - /mnt/images:/app/static/images
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   scrapper_app:
     build: ./scrapper-dp2
     container_name: scrapper_app
     restart: unless-stopped
     env_file: ./scrapper-dp2/.env
-    volumes:
-      - /mnt/images:/app/static/images
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   nginx_proxy:
     image: nginx:latest
