@@ -1,0 +1,9 @@
+#cloud-config
+user: dp2-user
+password: domotica-prod
+chpasswd: { expire: False }
+ssh_pwauth: True
+package_update: true
+packages:
+  - qemu-guest-agent
+  - iptables-persistent

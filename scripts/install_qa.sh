@@ -2,7 +2,7 @@
 # This script is only for Ubuntu systems
 sudo apt update -y
 sudo apt upgrade -y
-sudo apt install -y git curl wget build-essential node npm
+sudo apt install -y git curl wget build-essential nodejs npm nginx
 
 # MySQL installation
 sudo apt install -y mysql-server
@@ -42,8 +42,8 @@ sudo rabbitmqctl set_permissions -p "${RABBITMQ_VHOST}" "${RABBITMQ_USER}" ".*" 
 
 # Docker installation
 # Add Docker's official GPG key:
-sudo apt update
-sudo apt install ca-certificates curl
+sudo apt update -y
+sudo apt install ca-certificates curl -y
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
@@ -57,10 +57,10 @@ Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
-sudo apt update
+sudo apt update -y
 
 # Install Docker Engine, CLI, and Containerd
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 
 # Post-installation steps
 sudo usermod -aG docker $USER
