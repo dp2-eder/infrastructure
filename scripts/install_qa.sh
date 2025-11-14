@@ -180,10 +180,8 @@ step_setup_directories() {
     sudo chmod -R 755 /mnt/images
     
     # Copy docker-compose file if it exists
-    if [ -f "docker-compose-vmqa.yml" ]; then
-        cp docker-compose-vmqa.yml /var/www/docker-compose.yml
-    elif [ -f "../docker/docker-compose-vmqa.yml" ]; then
-        cp ../docker/docker-compose-vmqa.yml /var/www/docker-compose.yml
+    if [ -f "docker/docker-compose-vmqa.yml" ]; then
+        cp docker/docker-compose-vmqa.yml /var/www/docker-compose.yml
     else
         log "Warning: docker-compose-vmqa.yml not found"
     fi
@@ -197,35 +195,13 @@ run_step "setup_directories" step_setup_directories
 # STEP 6: Clone/Update Repositories
 # ============================================
 
-clone_or_update() {
-    local url="$1" dir="$2"
-    if [ -d "$dir" ]; then
-        if [ -d "$dir/.git" ]; then
-            log "Updating existing repo $dir..."
-            git -C "$dir" fetch --all --prune || { log "git fetch failed for $dir"; return 1; }
-            # Try a safe pull; prefer resetting to remote HEAD to avoid local conflicts
-            git -C "$dir" reset --hard origin/HEAD >/dev/null 2>&1 || git -C "$dir" pull || { log "Failed to update $dir"; return 1; }
-        else
-            timestamp=$(date +%s)
-            log "Directory $dir exists but is not a git repo. Backing up to ${dir}.bak.$timestamp"
-            mv "$dir" "${dir}.bak.$timestamp" || { log "Failed to backup $dir"; return 1; }
-            log "Cloning $url into $dir..."
-            git clone "$url" "$dir" || { log "Failed to clone $url"; return 1; }
-        fi
-    else
-        log "Cloning $url into $dir..."
-        git clone "$url" "$dir" || { log "Failed to clone $url"; return 1; }
-    fi
-    return 0
-}
-
 step_clone_repos() {
     cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
     
-    clone_or_update https://github.com/dp2-eder/back-dp2.git back-dp2 || return 1
-    clone_or_update https://github.com/dp2-eder/front-dp2.git front-dp2 || return 1
-    clone_or_update https://github.com/dp2-eder/scrapper-dp2.git scrapper-dp2 || return 1
-    clone_or_update https://github.com/dp2-eder/front-admin.git front-admin || return 1
+    git clone https://github.com/dp2-eder/back-dp2.git
+    git clone https://github.com/dp2-eder/front-dp2.git
+    git clone https://github.com/dp2-eder/scrapper-dp2.git
+    git clone https://github.com/dp2-eder/front-admin.git
     
     return 0
 }
@@ -263,7 +239,32 @@ step_build_frontend() {
 run_step "build_frontend" step_build_frontend
 
 # ============================================
-# STEP 8: Start Docker Compose Services
+# STEP 8: Copy Environment Files
+# ============================================
+step_copy_env_files() {
+    # Copy .env.example to .env in each repo if .env does not exist
+    for repo in back-dp2 front-dp2 scrapper-dp2 front-admin; do
+        cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
+        if [ -d "$repo" ]; then
+            cd "$repo" || { log "Cannot cd to $repo"; return 1; }
+            if [ -f ".env.example" ] && [ ! -f ".env" ]; then
+                cp .env.example .env
+                log "Copied .env.example to .env in $repo"
+            else
+                log ".env already exists or .env.example missing in $repo"
+            fi
+        else
+            log "Repository $repo does not exist"
+        fi
+    done
+
+    return 0
+}
+
+run_step "copy_env_files" step_copy_env_files
+
+# ============================================
+# STEP 9: Start Docker Compose Services
 # ============================================
 step_docker_compose_up() {
     cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
