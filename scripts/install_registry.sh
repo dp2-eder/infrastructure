@@ -56,12 +56,13 @@ log "=== Starting Docker Private Registry Installation ==="
 step_system_update() {
     sudo apt update -y
     sudo apt upgrade -y
+    # apache2-utils is needed for htpasswd
     sudo apt install apache2-utils apt-transport-https ca-certificates curl software-properties-common -y
 }
 
 run_step "system_update" step_system_update
 
-# --- STEP 2: Dicker Install ---
+# --- STEP 2: Docker Install ---
 step_docker_install() {
     # Add Docker's official GPG key
     sudo apt update -y
@@ -93,15 +94,51 @@ EOF
 
 run_step "docker_install" step_docker_install
 
+# ----------------------------------------------------
+# --- STEP 3: Configure Auth and Run Registry ---
+# ----------------------------------------------------
+step_configure_auth_and_start_registry() {
+    log "Setting up Registry directories and htpasswd..."
+    
+    # 1. Create directories for data and auth persistence
+    sudo mkdir -p "$REGISTRY_DIR/data"
+    sudo mkdir -p "$REGISTRY_DIR/auth"
+    local htpasswd_file="$REGISTRY_DIR/auth/htpasswd"
+    
+    sudo htpasswd -Bc /opt/registry/auth/htpasswd $REGISTRY_USER $REGISTRY_PASS
+    log "htpasswd file created for user $REGISTRY_USER."
 
-# --- STEP 3: Start Registry ---
-step_start_registry() {
-    docker run -d -p 5000:5000 --restart=always --name registry registry:2
+    # 3. Stop and remove any existing registry container
+    if sudo docker ps -a --format '{{.Names}}' | grep -q "^registry$"; then
+        log "Stopping and removing old 'registry' container..."
+        sudo docker stop registry || true
+        sudo docker rm registry || true
+    fi
+
+    # 4. Start the new container with persistence and htpasswd authentication
+    log "Starting Docker Registry with htpasswd authentication on port 5000..."
+    
+    sudo docker run -d \
+      -p 5000:5000 \
+      --restart=always \
+      --name registry \
+      -v "$REGISTRY_DIR/data":/var/lib/registry \
+      -v "$REGISTRY_DIR/auth":/auth \
+      -e REGISTRY_AUTH=htpasswd \
+      -e REGISTRY_AUTH_HTPASSWD_REALM="Registry Realm" \
+      -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+      registry:2
+    
 }
-run_step "start_registry" step_start_registry
+
+run_step "configure_auth_and_start_registry" step_configure_auth_and_start_registry
 
 log "=== Registry Installation Complete ==="
-log "Registry URL: https://$REGISTRY_DOMAIN:5000"
-log "Web UI URL:   http://$REGISTRY_DOMAIN:8080"
-log "Credentials:  $REGISTRY_USER / (hidden)"
+log "Registry URL: http://$REGISTRY_DOMAIN:5000"
+log "NOTE: This registry is running on HTTP (Insecure) and requires client configuration."
 log ""
+log "To push images, tag them as follows:"
+log "  docker tag <image> $REGISTRY_DOMAIN:5000/<image>"
+log "Then push using:"
+log "  docker push $REGISTRY_DOMAIN:5000/<image>"
+log "========================================"
