@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web_app:
     image: hub.inf.pucp.edu.pe/front-dp2:latest
