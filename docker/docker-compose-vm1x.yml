@@ -1,32 +1,36 @@
 version: '3.8'
 
-
 services:
- web_app:
-   build: ./front-dp2
-   container_name: web_app
-   restart: unless-stopped
-   env_file: ./front-dp2/.env
+  web_app:
+    image: hub.inf.pucp.edu.pe/front-dp2:latest
+    container_name: web_app
+    restart: unless-stopped
+    env_file: .env.front-dp2
 
+  core_app:
+    image: hub.inf.pucp.edu.pe/back-dp2:latest
+    container_name: core_app
+    restart: unless-stopped
+    env_file: .env.back-dp2
+    volumes:
+      - /mnt/images:/app/static/images
 
- core_app:
-   build: ./back-dp2
-   container_name: core_app
-   restart: unless-stopped
-   env_file: ./back-dp2/.env
-   volumes:
-     - /mnt/images:/app/static/images
+  admin_app:
+    image: hub.inf.pucp.edu.pe/front-admin:latest
+    container_name: admin_app
+    restart: unless-stopped
+    env_file: .env.front-admin
 
-
- nginx_proxy:
-   image: nginx:latest
-   container_name: nginx_proxy_vm1
-   restart: unless-stopped
-   ports:
-     - "80:80"
-   volumes:
-     - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-     - /mnt/images:/mnt/images:ro
-   depends_on:
-     - web_app     
-     - core_app
+  nginx_proxy:
+    image: nginx:latest
+    container_name: nginx_proxy_vm1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - /mnt/images:/mnt/images:ro
+    depends_on:
+      - web_app
+      - core_app
+      - admin_app
