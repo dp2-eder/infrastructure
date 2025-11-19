@@ -97,7 +97,7 @@ step_setup_nginx() {
     log "Installing and configuring Nginx as a reverse proxy..."
     
     sudo apt install nginx -y
-    sudo cp ../nginx/vmregistry-nginx.conf /etc/nginx/sites-available/registry.conf 
+    sudo cp nginx/vmregistry-nginx.conf /etc/nginx/sites-available/registry.conf 
     sudo ln -s /etc/nginx/sites-available/registry.conf /etc/nginx/sites-enabled/
     sudo rm /etc/nginx/sites-enabled/default
     sudo nginx -t
