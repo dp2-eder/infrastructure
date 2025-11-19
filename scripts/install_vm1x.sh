@@ -121,7 +121,3 @@ if mount | grep -q "/mnt/images"; then
     log "✅ NFS Montado correctamente."
 else
     log "❌ NFS NO montado. Revise la conexión con VM3 ($VM3_IP)."
-fi
-log ""
-log "Nota: Es recomendable reiniciar la sesión o el servidor para aplicar los permisos de grupo Docker."
-log ""
