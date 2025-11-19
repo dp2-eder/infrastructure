@@ -7,8 +7,11 @@ CHECKPOINT_FILE="/var/lib/dp2/install_registry.checkpoint"
 LOG_FILE="/var/log/dp2_install_registry.log"
 REGISTRY_DIR="/opt/docker-registry"
 REGISTRY_DOMAIN="10.0.1.10" # Use the VM's IP address or domain name
-REGISTRY_USER="dp2admin"
-REGISTRY_PASS="domotica-prod"
+REGISTRY_MAIN_USER="dp2-user"
+REGISTRY_MAIN_PASS="domotica-prod"
+
+REGISTRY_USER="manolo"
+REGISTRY_PASS="h0l@!Mundo"
 
 # Setup logs and checkpoints
 sudo mkdir -p "$(dirname "$CHECKPOINT_FILE")"
@@ -105,8 +108,10 @@ step_configure_auth_and_start_registry() {
     sudo mkdir -p "$REGISTRY_DIR/auth"
     local htpasswd_file="$REGISTRY_DIR/auth/htpasswd"
     
-    sudo htpasswd -Bc /opt/registry/auth/htpasswd $REGISTRY_USER $REGISTRY_PASS
-    log "htpasswd file created for user $REGISTRY_USER."
+    sudo htpasswd -Bc "$htpasswd_file" "$REGISTRY_MAIN_USER" "$REGISTRY_MAIN_PASS"
+    log "htpasswd file created for user $REGISTRY_MAIN_USER."
+
+    sudo htpasswd -B "$htpasswd_file" "$REGISTRY_USER" "$REGISTRY_PASS"
 
     # 3. Stop and remove any existing registry container
     if sudo docker ps -a --format '{{.Names}}' | grep -q "^registry$"; then
