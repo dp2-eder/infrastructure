@@ -6,7 +6,7 @@ set -e
 CHECKPOINT_FILE="/var/lib/dp2/install_registry.checkpoint"
 LOG_FILE="/var/log/dp2_install_registry.log"
 REGISTRY_DIR="/opt/docker-registry"
-REGISTRY_DOMAIN="10.0.1.10" # Use the VM's IP address or domain name
+REGISTRY_DOMAIN=$(hostname -I | awk '{print $1}')
 REGISTRY_MAIN_USER="dp2-user"
 REGISTRY_MAIN_PASS="domotica-prod"
 
@@ -59,7 +59,6 @@ log "=== Starting Docker Private Registry Installation ==="
 step_system_update() {
     sudo apt update -y
     sudo apt upgrade -y
-    # apache2-utils is needed for htpasswd
     sudo apt install apache2-utils apt-transport-https ca-certificates curl software-properties-common -y
 }
 
@@ -87,11 +86,7 @@ EOF
     sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
     
     # Post-installation steps
-    sudo usermod -aG docker $USER
-    
-    # Verify Docker installation
-    sudo docker --version || return 1
-    
+    sudo usermod -aG docker $USER    
     return 0
 }
 
@@ -103,22 +98,14 @@ run_step "docker_install" step_docker_install
 step_configure_auth_and_start_registry() {
     log "Setting up Registry directories and htpasswd..."
     
-    # 1. Create directories for data and auth persistence
     sudo mkdir -p "$REGISTRY_DIR/data"
     sudo mkdir -p "$REGISTRY_DIR/auth"
     local htpasswd_file="$REGISTRY_DIR/auth/htpasswd"
     
-    sudo htpasswd -Bc "$htpasswd_file" "$REGISTRY_MAIN_USER" "$REGISTRY_MAIN_PASS"
+    sudo htpasswd -bcB "$htpasswd_file" "$REGISTRY_MAIN_USER" "$REGISTRY_MAIN_PASS"
     log "htpasswd file created for user $REGISTRY_MAIN_USER."
-
-    sudo htpasswd -B "$htpasswd_file" "$REGISTRY_USER" "$REGISTRY_PASS"
-
-    # 3. Stop and remove any existing registry container
-    if sudo docker ps -a --format '{{.Names}}' | grep -q "^registry$"; then
-        log "Stopping and removing old 'registry' container..."
-        sudo docker stop registry || true
-        sudo docker rm registry || true
-    fi
+    sudo htpasswd -bB "$htpasswd_file" "$REGISTRY_USER" "$REGISTRY_PASS"
+    log "htpasswd file created for user $REGISTRY_USER."
 
     # 4. Start the new container with persistence and htpasswd authentication
     log "Starting Docker Registry with htpasswd authentication on port 5000..."
