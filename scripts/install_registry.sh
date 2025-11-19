@@ -59,7 +59,10 @@ log "=== Starting Docker Private Registry Installation ==="
 step_system_update() {
     sudo apt update -y
     sudo apt upgrade -y
-    sudo apt install apache2-utils apt-transport-https ca-certificates curl software-properties-common -y
+    sudo apt install apache2-utils \
+         apt-transport-https ca-certificates \
+         curl software-properties-common \
+         certbot python3-certbot-nginx -y
 }
 
 run_step "system_update" step_system_update
@@ -100,24 +103,10 @@ step_setup_nginx() {
     sudo cp nginx/vmregistry-nginx.conf /etc/nginx/sites-available/registry.conf 
     sudo ln -s /etc/nginx/sites-available/registry.conf /etc/nginx/sites-enabled/
     sudo rm /etc/nginx/sites-enabled/default
-    sudo nginx -t
-    sudo systemctl restart nginx
 }
 
 run_step "setup_nginx" step_setup_nginx
 
-step_install_tunnel() {
-    log "Installing and configuring TUN/TAP module..."
-    
-    sudo mkdir -p --mode=0755 /usr/share/keyrings
-    curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg | sudo tee /usr/share/keyrings/cloudflare-public-v2.gpg >/dev/null
-    echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
-    sudo apt-get update && sudo apt-get install cloudflared -y
-
-    sudo cloudflared service install eyJhIjoiNGIzZDg2YjZkYmQ5Zjc1ZmZkZGIzYTZiMzJlMmRlNWEiLCJ0IjoiNWY4MDZiMmYtZTZkZS00ZTNjLWIyOGQtN2I1YjE1YzhlY2FiIiwicyI6Ik1qZzRNbUZrWWpFdE1HVm1aaTAwTjJKaExXRmpZelF0TjJJMll6WmlZV0l3WWpsaSJ9
-}
-
-run_step "install_tunnel" step_install_tunnel
 
 # --- STEP 4: Configure Auth and Run Registry ---
 step_configure_auth_and_start_registry() {
