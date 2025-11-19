@@ -90,13 +90,13 @@ EOF
 # --- 5. LANZAR ARQUITECTURA (MODIFICADO) ---
 # Las llamadas ahora pasan el archivo user-data correcto
 
-# crear_vm "vm-lb" 1024 1 "10G" "user-data-vm-lb.yaml" "--network network=default,model=virtio"
-# crear_vm "vm-1a" 2048 2 "10G" "user-data-vm-1a.yaml" ""
-# crear_vm "vm-1b" 2048 2 "10G" "user-data-vm-1b.yaml" ""
-# crear_vm "vm-2a" 2048 2 "10G" "user-data-vm-2a.yaml" ""
-# crear_vm "vm-3"  2048 2 "10G" "user-data-vm-3.yaml"  ""
+crear_vm "vm-lb" 1024 1 "10G" "user-data-vm-lb.yaml" "--network network=default,model=virtio"
+crear_vm "vm-1a" 2048 2 "10G" "user-data-vm-1a.yaml" ""
+crear_vm "vm-1b" 2048 2 "10G" "user-data-vm-1b.yaml" ""
+crear_vm "vm-2a" 2048 2 "10G" "user-data-vm-2a.yaml" ""
+crear_vm "vm-3"  2048 2 "10G" "user-data-vm-3.yaml"  ""
 
-crear_vm "vm-qa" 4196 4 "20G" "user-data-vm-qa.yaml" "--network network=default,model=virtio"
+# crear_vm "vm-qa" 4196 4 "20G" "user-data-vm-qa.yaml" "--network network=default,model=virtio"
 
 echo "--- ¡Arquitectura desplegada! ---"
 echo "Las VMs están arrancando y auto-configurando sus IPs."

@@ -107,7 +107,18 @@ step_mysql_setup() {
     sudo mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'$VM1B_IP';" || return 1
     sudo mysql -e "FLUSH PRIVILEGES;" || return 1
     
-    log "  Usuarios de MySQL configurados correctamente."
+    log "  Configurando MySQL para escuchar en 0.0.0.0..."
+    if [ -f "$MYSQL_CONF_FILE" ]; then
+        sudo sed -i "s/^\(bind-address\s*=\s*\)127\.0\.0\.1/\10.0.0.0/" "$MYSQL_CONF_FILE"
+        log "  bind-address actualizado en $MYSQL_CONF_FILE"
+    else
+        log "  Advertencia: No se encontró $MYSQL_CONF_FILE. Omitiendo."
+    fi
+    
+    log "  Reiniciando MySQL para aplicar la configuración..."
+    sudo systemctl restart mysql
+    sudo systemctl enable mysql
+
     return 0
 }
 
