@@ -230,10 +230,10 @@ run_step "setup_directories" step_setup_directories
 step_clone_repos() {
     cd /var/www/ || { log "Cannot cd /var/www/"; return 1; }
     
-    git clone https://github.com/dp2-eder/back-dp2.git
-    git clone https://github.com/dp2-eder/front-dp2.git
-    git clone https://github.com/dp2-eder/scrapper-dp2.git
-    git clone https://github.com/dp2-eder/front-admin.git
+    git clone -b qa https://github.com/dp2-eder/back-dp2.git
+    git clone -b qa https://github.com/dp2-eder/front-dp2.git
+    git clone -b qa https://github.com/dp2-eder/scrapper-dp2.git
+    git clone -b qa https://github.com/dp2-eder/front-admin.git
     
     return 0
 }
